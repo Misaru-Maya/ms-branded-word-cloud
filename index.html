@@ -697,7 +697,10 @@
             'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all',
             'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor',
             'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't', 'can', 'will',
-            'just', 'don', 'should', 'now', 've', 'll', 're'
+            'just', 'don', 'should', 'now', 've', 'll', 're',
+            'seem', 'think', 'sho', 'shoe', 'shoes', 'really', 'much', 'do', "don't", 'will', 'would', "won't", "can't", 'can', 'should', 'could',
+            'know', 'like', 'seem', 'make', 'made', 'is', "isn't", 'isn', 'in', 'at', 'about', 'around', 'way', 'doesn', 'overall', 'wouldn', 'couldn',
+            'dont', 'little', 'less', 'more', 'skip', 'nothing', 'none', 'meant',
         ]);
 
         
@@ -852,9 +855,9 @@
                 return;
             }
             // 2. Large input size limit
-            const maxInputLength = 20000; // 20k chars
+            const maxInputLength = 100000; // 100k chars
             if (inputText.length > maxInputLength) {
-                showMessage('Input is too large. Please provide less than 20,000 characters.', 'error');
+                showMessage('Input is too large. Please provide less than 100,000 characters.', 'error');
                 return;
             }
             setLoadingState(true);
@@ -929,7 +932,7 @@
             const sortedWords = Object.entries(frequency)
                 .map(([word, freq]) => ({ word, frequency: freq }))
                 .sort((a, b) => b.frequency - a.frequency)
-                .slice(0, 20);  // Top 20 words
+                .slice(0, 30);  // Top 30 words
             return sortedWords;
         }
 
@@ -966,7 +969,7 @@
             let fontStep = 2;
             let minFontLimit = 10;
             let tryCount = 0;
-            const padding = 8; // Padding to keep words inside the canvas
+            const padding = 20; // Increased padding to keep words well inside the canvas
             while (!placedAll && minFont >= minFontLimit && tryCount < 10) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#FFFFFF';
