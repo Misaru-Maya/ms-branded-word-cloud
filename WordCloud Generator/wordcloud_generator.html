@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MakerSights Word Cloud Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: #FFFFFF;
+            color: #121212;
+            line-height: 1.6;
+        }
+
+        .container {
+            margin-left: 0;
+            max-width: 100vw;
+            width: 100vw;
+            box-sizing: border-box;
+            padding-left: 2.5rem;
+            padding-right: 2.5rem;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 380px 1fr 340px;
+            gap: 1.5rem;
+            align-items: stretch;
+            justify-content: flex-start;
+            height: 100%;
+        }
+
+        .left-panel, .right-panel {
+            min-width: 340px;
+            max-width: 380px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+
+        .main-title {
+            font-family: 'Work Sans', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 0;
+        }
+
+        .subtitle {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.1rem;
+            text-align: center;
+            color: #2B2B28;
+            margin-bottom: 1rem;
+            margin-top: 0;
+        }
+
+        .input-section {
+            background: #F8F9FA;
+            border: 2px solid #E3E2DF;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 0;
+            width: 100%;
+            min-width: 340px;
+            max-width: 380px;
+            min-height: 600px;
+            max-height: 600px;
+            height: 600px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-button {
+            background: #FFFFFF;
+            border: 2px solid #E3E2DF;
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab-button.active {
+            background: #6DAE5B;
+            color: #FFFFFF;
+            border-color: #6DAE5B;
+        }
+
+        .tab-button:hover:not(.active) {
+            border-color: #6DAE5B;
+            color: #6DAE5B;
+        }
+
+        .input-area {
+            display: none;
+        }
+
+        .input-area.active {
+            display: block;
+        }
+
+        .file-upload {
+            border: 2px dashed #6DAE5B;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #FFFFFF;
+            width: 100%;
+            box-sizing: border-box;
+            min-height: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-upload:hover {
+            background: #F0F8ED;
+            border-color: #5A9B4F;
+        }
+
+        .file-upload.dragover {
+            background: #F0F8ED;
+            border-color: #5A9B4F;
+            transform: scale(1.02);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .text-input {
+            width: 100%;
+            min-height: 80px;
+            max-height: 300px;
+            height: 80px;
+            padding: 1rem;
+            border: 2px solid #E3E2DF;
+            border-radius: 8px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1rem;
+            resize: vertical;
+            background: #FFFFFF;
+        }
+
+        .text-input:focus {
+            outline: none;
+            border-color: #6DAE5B;
+            box-shadow: 0 0 0 3px rgba(109, 174, 91, 0.1);
+        }
+
+        .sentiment-section {
+            margin: 1rem 0 0.5rem 0;
+        }
+
+        .shape-section {
+            margin: 0.5rem 0 1rem 0;
+        }
+
+        .sentiment-label {
+            font-family: 'Work Sans', sans-serif;
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 0.75rem;
+            display: block;
+        }
+
+        .sentiment-options {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: nowrap;
+        }
+
+        .sentiment-option {
+            padding: 0.5rem 0.5rem;
+            min-width: 90px;
+            justify-content: center;
+            border-radius: 12px;
+        }
+
+        .sentiment-option:hover {
+            border-color: #6DAE5B;
+        }
+
+        .sentiment-option.selected {
+            border-color: #E2EFDE;
+            background: #E2EFDE;
+            border-radius: 12px;
+        }
+
+        .sentiment-radio {
+            display: none;
+        }
+
+        .sentiment-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #FFFFFF;
+            box-shadow: 0 0 0 1px #E3E2DF;
+        }
+
+        .generate-button {
+            margin-top: 1rem;
+            width: 100%;
+            background: #6DAE5B;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            padding: 1.25rem 2.5rem;
+            font-family: 'Work Sans', sans-serif;
+            font-weight: 600;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .generate-button:hover {
+            background: #5A9B4F;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(109, 174, 91, 0.3);
+        }
+
+        .generate-button:disabled {
+            background: #B6BDC6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .controls {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            gap: 1rem;
+            margin-bottom: 0;
+            background: none;
+            box-shadow: none;
+            padding: 0;
+            z-index: 2;
+        }
+
+        .download-button-large {
+            background: #2B2B28;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            padding: 1rem 2rem;
+            font-family: 'Work Sans', sans-serif;
+            font-weight: 600;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-left: auto;
+        }
+
+        .download-button-large:hover:not(:disabled) {
+            background: #121212;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(43, 43, 40, 0.3);
+        }
+
+        .control-button {
+            background: #FFFFFF;
+            border: 2px solid #E3E2DF;
+            border-radius: 8px;
+            padding: 0.75rem 1.25rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .control-button:hover:not(:disabled) {
+            border-color: #6DAE5B;
+            color: #6DAE5B;
+        }
+
+        .control-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .download-button {
+            background: #2B2B28;
+            color: #FFFFFF;
+            border-color: #2B2B28;
+        }
+
+        .download-button:hover:not(:disabled) {
+            background: #121212;
+            color: #FFFFFF;
+            border-color: #121212;
+        }
+
+        .cloud-container {
+            background: #FFFFFF;
+            border-radius: 12px;
+            padding: 0;
+            min-height: 600px;
+            max-height: 600px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            width: 100%;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .cloud-canvas {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            flex: 1;
+            object-fit: contain;
+            height: 100%;
+            width: 100%;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #7E8BA0;
+            font-family: 'Space Grotesk', sans-serif;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 500px;
+        }
+
+        .empty-state h3 {
+            font-family: 'Work Sans', sans-serif;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: #2B2B28;
+        }
+
+        .word-list {
+            background: #F8F9FA;
+            border: 2px solid #E3E2DF;
+            border-radius: 12px;
+            padding: 1.5rem;
+            width: 100%;
+            min-height: 600px;
+            max-height: 600px;
+            height: 600px;
+            overflow-y: auto;
+            margin-top: 0;
+        }
+
+        .word-list h3 {
+            font-family: 'Work Sans', sans-serif;
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: #2B2B28;
+        }
+
+        .word-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .word-tag {
+            background: #FFFFFF;
+            border: 2px solid #E3E2DF;
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .word-tag:hover {
+            border-color: #6DAE5B;
+            background: #F0F8ED;
+        }
+
+        .word-tag.removed {
+            background: #FFE6E6;
+            border-color: #FF9999;
+            opacity: 0.7;
+        }
+
+        .word-tag.removed:hover {
+            background: #FFD6D6;
+            border-color: #FF7777;
+        }
+
+        .word-frequency {
+            background: #6DAE5B;
+            color: #FFFFFF;
+            border-radius: 10px;
+            padding: 0.2rem 0.5rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .error-message {
+            background: #FFE6E6;
+            border: 2px solid #FF9999;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: #D32F2F;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .success-message {
+            background: #E8F5E8;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: #2E7D32;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #E3E2DF;
+            border-radius: 50%;
+            border-top-color: #6DAE5B;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 1200px) {
+            .container {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            .right-panel {
+                max-width: 100%;
+                min-width: 0;
+            }
+            .left-panel, .input-section {
+                max-width: 100%;
+                min-width: 0;
+            }
+        }
+
+        /* Consistent button font size */
+        .tab-button,
+        .sentiment-option,
+        .generate-button,
+        .control-button,
+        .download-button-large,
+        .download-button {
+            font-size: 1rem; /* Match the smallest button font size */
+            padding: 0.75rem 1.5rem; /* Adjust as needed for visual consistency */
+        }
+
+        .header-section {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 0.5rem auto;
+            padding-top: 2rem;
+            gap: 1.5rem;
+        }
+
+        .brand-logo {
+            position: static;
+            max-height: 48px;
+            margin-right: 1rem;
+            background: transparent;
+        }
+
+        .side-panel-header {
+            font-family: 'Work Sans', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #282828;
+            margin-bottom: 1.5rem;
+            margin-top: 0;
+            letter-spacing: 0.01em;
+        }
+
+        .word-list h3 {
+            font-family: 'Work Sans', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #282828;
+            margin-bottom: 1.5rem;
+            margin-top: 0;
+            letter-spacing: 0.01em;
+        }
+
+        /* Add footer credit styling */
+        .footer-credit {
+            position: fixed;
+            right: 24px;
+            bottom: 18px;
+            color: #7E8BA0;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1rem;
+            background: rgba(255,255,255,0.85);
+            padding: 0.5rem 1.2rem;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            z-index: 1000;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-section">
+            <img src="makersights_logo.png" alt="MakerSights logo" class="brand-logo">
+            <h1 class="main-title">WORD CLOUD GENERATOR</h1>
+        </div>
+        <p class="subtitle">Transform raw survey text into client-ready, on-brand word clouds in seconds</p>
+        <div class="main-content">
+            <div class="left-panel">
+                <div id="messageArea"></div>
+                <div class="input-section">
+                    <h3 class="side-panel-header">Data Input</h3>
+                    <div class="input-tabs">
+                        <button class="tab-button active" data-tab="text">Paste Text</button>
+                        <button class="tab-button" data-tab="csv">Upload CSV</button>
+                    </div>
+
+                    <div class="input-area active" id="text-tab">
+                        <textarea class="text-input" placeholder="Paste your survey responses, feedback, or any text data here!"></textarea>
+                    </div>
+
+                    <div class="input-area" id="csv-tab">
+                        <div class="file-upload" onclick="document.getElementById('csvFile').click()" style="width: 100%;">
+                            <input type="file" id="csvFile" class="file-input" accept=".csv" />
+                            <p>📄 Click to upload CSV file or drag and drop</p>
+                        </div>
+                        <div id="columnSelector" class="hidden" style="margin-top: 1rem;">
+                            <label for="columnSelect" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Select the column containing text data:</label>
+                            <select id="columnSelect" style="padding: 0.5rem; border: 2px solid #E3E2DF; border-radius: 4px; font-family: 'Space Grotesk', sans-serif;"></select>
+                        </div>
+                    </div>
+
+                    <div class="sentiment-section">
+                        <label class="sentiment-label">Consumer sentiment:</label>
+                        <div class="sentiment-options">
+                            <label class="sentiment-option selected">
+                                <input type="radio" name="sentiment" value="positive" checked class="sentiment-radio">
+                                <div class="sentiment-color" style="background: #6DAE5B;"></div>
+                                <span>Positive</span>
+                            </label>
+                            <label class="sentiment-option">
+                                <input type="radio" name="sentiment" value="neutral" class="sentiment-radio">
+                                <div class="sentiment-color" style="background: #7E8BA0;"></div>
+                                <span>Neutral</span>
+                            </label>
+                            <label class="sentiment-option">
+                                <input type="radio" name="sentiment" value="negative" class="sentiment-radio">
+                                <div class="sentiment-color" style="background: #FCD348;"></div>
+                                <span>Negative</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="shape-section">
+                        <label class="sentiment-label">Output shape:</label>
+                        <div class="sentiment-options">
+                            <label class="sentiment-option selected">
+                                <input type="radio" name="cloudShape" value="circle" checked class="sentiment-radio">
+                                <span>Circle</span>
+                            </label>
+                            <label class="sentiment-option">
+                                <input type="radio" name="cloudShape" value="oval" class="sentiment-radio">
+                                <span>Oval</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button class="generate-button" onclick="generateWordCloud()">
+                        <span class="button-text">GENERATE WORD CLOUD</span>
+                        <span class="loading hidden"></span>
+                    </button>
+                </div>
+            </div>
+            <div class="cloud-container hidden" id="cloudContainerSection">
+                <div class="controls" id="controlsSection">
+                    <button class="download-button-large" onclick="downloadPNG()" id="downloadBtn">
+                        DOWNLOAD PNG
+                    </button>
+                </div>
+
+                <div class="empty-state" id="emptyState">
+                    <h3>No word cloud yet</h3>
+                    <p>Generate your first word cloud using the controls on the left</p>
+                </div>
+                <canvas id="wordCloudCanvas" class="cloud-canvas hidden" width="1400" height="700"></canvas>
+            </div>
+            <div class="right-panel">
+                <div class="word-list hidden" id="wordListSection">
+                    <h3 style="margin-bottom: 0.5rem;">Words in Cloud</h3>
+                    <div style="font-size: 1rem; color: #7E8BA0; margin-bottom: 1rem;">(💡click to remove/restore!)</div>
+                    <div class="word-tags" id="wordTags"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-credit">Built by Misaki, powered by ChatGPT, Claude, and Cursor🪄</div>
+
+    <script>
+        // Global variables
+        let wordFrequencies = [];
+        let removedWords = new Set();
+        let csvData = null;
+        let currentSentiment = 'positive';
+        let currentShape = 'circle';
+        
+        // Color palettes based on MakerSights design guidelines
+        const colorPalettes = {
+            positive: [
+                '#282828', // Thunder
+                '#8AEB7C', // Lichen
+                '#6DAE5B', // Dusty Green
+                '#A7CE9D'  // Green Spring Rain
+            ],
+            neutral: [
+                '#121212', // Onyx
+                '#282828', // Thunder
+                '#393C2C', // Dune
+                '#7E8DA0', // Ashen Twilight
+                '#98A4B3'  // Soft Smoke
+            ],
+            negative: [
+                '#282828', // Thunder
+                '#393C2C', // Dune
+                '#E7CB38', // Wattle
+                '#ECD560'  // Arylide Yellow
+            ]
+        };
+
+        // Stop words list (English)
+        const stopWords = new Set([
+            'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours',
+            'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers',
+            'herself', 'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves',
+            'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are',
+            'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does',
+            'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until',
+            'while', 'of', 'at', 'by', 'for', 'with', 'through', 'during', 'before', 'after',
+            'above', 'below', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again',
+            'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all',
+            'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor',
+            'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't', 'can', 'will',
+            'just', 'don', 'should', 'now', 've', 'll', 're'
+        ]);
+
+        
+        // Initialize event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeTabSwitching();
+            initializeFileUpload();
+            initializeSentimentSelection();
+        });
+
+        function initializeTabSwitching() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const inputAreas = document.querySelectorAll('.input-area');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetTab = button.dataset.tab;
+                    
+                    // Update button states
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    // Update input area visibility
+                    inputAreas.forEach(area => area.classList.remove('active'));
+                    document.getElementById(targetTab + '-tab').classList.add('active');
+                });
+            });
+        }
+
+        function initializeFileUpload() {
+            const fileUpload = document.querySelector('.file-upload');
+            const fileInput = document.getElementById('csvFile');
+
+            // Drag and drop functionality
+            fileUpload.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fileUpload.classList.add('dragover');
+            });
+
+            fileUpload.addEventListener('dragleave', () => {
+                fileUpload.classList.remove('dragover');
+            });
+
+            fileUpload.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileUpload.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFileUpload(files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileUpload(e.target.files[0]);
+                }
+            });
+        }
+
+        function initializeSentimentSelection() {
+            const sentimentOptions = document.querySelectorAll('.sentiment-option');
+            
+            sentimentOptions.forEach(option => {
+                option.addEventListener('click', () => {
+                    const radio = option.querySelector('input[type="radio"]');
+                    const radioName = radio.name;
+                    
+                    // Update selection for this radio group
+                    document.querySelectorAll(`input[name="${radioName}"]`).forEach(r => {
+                        r.closest('.sentiment-option').classList.remove('selected');
+                    });
+                    
+                    option.classList.add('selected');
+                    radio.checked = true;
+                    
+                    if (radioName === 'sentiment') {
+                        currentSentiment = radio.value;
+                    } else if (radioName === 'cloudShape') {
+                        currentShape = radio.value;
+                    }
+                });
+            });
+        }
+
+        function handleFileUpload(file) {
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                showMessage('Please upload a CSV file.', 'error');
+                return;
+            }
+
+            Papa.parse(file, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (results.errors.length > 0) {
+                        showMessage('Error parsing CSV: ' + results.errors[0].message, 'error');
+                        return;
+                    }
+
+                    csvData = results.data;
+                    const columns = Object.keys(csvData[0] || {});
+                    
+                    if (columns.length === 0) {
+                        showMessage('No columns found in CSV file.', 'error');
+                        return;
+                    }
+
+                    // Show column selector
+                    const columnSelector = document.getElementById('columnSelector');
+                    const columnSelect = document.getElementById('columnSelect');
+                    
+                    columnSelect.innerHTML = '';
+                    columns.forEach(column => {
+                        const option = document.createElement('option');
+                        option.value = column;
+                        option.textContent = column;
+                        columnSelect.appendChild(option);
+                    });
+                    
+                    columnSelector.classList.remove('hidden');
+                    showMessage(`CSV uploaded successfully! Found ${csvData.length} rows and ${columns.length} columns.`, 'success');
+                }
+            });
+        }
+
+        function loadDemoData() {
+            document.querySelector('.text-input').value = demoData;
+            // Switch to text tab
+            document.querySelector('[data-tab="text"]').click();
+            showMessage('Demo data loaded! Click "Generate Word Cloud" to see it in action.', 'success');
+        }
+
+        function generateWordCloud() {
+            const textInput = document.querySelector('.text-input').value;
+            const selectedColumn = document.getElementById('columnSelect').value;
+            let inputText = '';
+            // Get input text from appropriate source
+            if (document.getElementById('text-tab').classList.contains('active')) {
+                inputText = textInput;
+            } else if (document.getElementById('csv-tab').classList.contains('active') && csvData) {
+                if (!selectedColumn) {
+                    showMessage('Please select a column from your CSV file.', 'error');
+                    return;
+                }
+                inputText = csvData.map(row => row[selectedColumn])
+                    .filter(text => typeof text === 'string' && text.trim().length > 0)
+                    .join(' ');
+            }
+            if (!inputText.trim()) {
+                showMessage('Please provide some text to generate a word cloud.', 'error');
+                return;
+            }
+            // 2. Large input size limit
+            const maxInputLength = 20000; // 20k chars
+            if (inputText.length > maxInputLength) {
+                showMessage('Input is too large. Please provide less than 20,000 characters.', 'error');
+                return;
+            }
+            setLoadingState(true);
+            setTimeout(() => {
+                try {
+                    const processedWords = processText(inputText);
+                    if (processedWords.length < 5) {
+                        showMessage('Not enough valid words found. Please provide more text or try different content.', 'error');
+                        setLoadingState(false);
+                        return;
+                    }
+                    wordFrequencies = processedWords;
+                    removedWords.clear();
+                    renderWordCloud();
+                    showWordList();
+                    showControls();
+                    setLoadingState(false);
+                } catch (error) {
+                    showMessage('Error generating word cloud: ' + error.message, 'error');
+                    setLoadingState(false);
+                }
+            }, 500);
+        }
+
+        // Add a simple plural-to-singular normalization function
+        function normalizeToSingular(word) {
+            // Basic English plural rules
+            if (word.endsWith('ies') && word.length > 4) {
+                // e.g. 'stories' -> 'story'
+                return word.slice(0, -3) + 'y';
+            } else if (word.endsWith('es') && word.length > 3 && !word.endsWith('ses') && !word.endsWith('xes') && !word.endsWith('zes')) {
+                // e.g. 'wishes' -> 'wish', but not 'glasses' or 'boxes'
+                return word.slice(0, -2);
+            } else if (word.endsWith('s') && word.length > 3 && !word.endsWith('ss')) {
+                // e.g. 'products' -> 'product', but not 'glass'
+                return word.slice(0, -1);
+            }
+            return word;
+        }
+
+        function processText(text) {
+            // 3. Unicode-aware cleaning
+            let cleanText = text.toLowerCase()
+                .replace(/[^\p{L}\p{N}\s-]/gu, ' ')  // Remove punctuation except hyphens, keep Unicode letters/numbers
+                .replace(/\s+/g, ' ')
+                .trim();
+            // Split into words
+            const words = cleanText.split(' ').filter(word => 
+                word.length > 2 && 
+                !stopWords.has(word) &&
+                !/^\d+$/.test(word) &&
+                word !== 'not' &&
+                word !== 'specified'
+            );
+            // Also filter out the phrase "not specified" if it appears as separate words
+            const filteredWords = [];
+            for (let i = 0; i < words.length; i++) {
+                if (words[i] === 'not' && words[i + 1] === 'specified') {
+                    i++;
+                    continue;
+                }
+                filteredWords.push(words[i]);
+            }
+            // Normalize to singular
+            const normalizedWords = filteredWords.map(normalizeToSingular);
+            // Count frequencies
+            const frequency = {};
+            normalizedWords.forEach(word => {
+                frequency[word] = (frequency[word] || 0) + 1;
+            });
+            // Convert to array and sort by frequency
+            const sortedWords = Object.entries(frequency)
+                .map(([word, freq]) => ({ word, frequency: freq }))
+                .sort((a, b) => b.frequency - a.frequency)
+                .slice(0, 20);  // Top 20 words
+            return sortedWords;
+        }
+
+        function renderWordCloud(targetCanvas, customWordFrequencies, customRemovedWords, customSentiment, customShape) {
+            const canvas = targetCanvas || document.getElementById('wordCloudCanvas');
+            const ctx = canvas.getContext('2d');
+            const emptyState = document.getElementById('emptyState');
+            if (!targetCanvas) {
+                canvas.classList.remove('hidden');
+                emptyState.classList.add('hidden');
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const wf = customWordFrequencies || wordFrequencies;
+            const rw = customRemovedWords || removedWords;
+            const sentiment = customSentiment || currentSentiment;
+            const shape = customShape || currentShape;
+            const availableWords = wf.filter(w => !rw.has(w.word));
+            if (availableWords.length === 0) {
+                if (!targetCanvas) {
+                    ctx.fillStyle = '#7E8BA0';
+                    ctx.font = '24px "Space Grotesk"';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('No words left! Undo to restore.', canvas.width / 2, canvas.height / 2);
+                }
+                return;
+            }
+            // --- DYNAMIC FONT SIZE LOOP ---
+            let maxFont = Math.round(canvas.height / 4);
+            let minFont = Math.round(canvas.height / 32);
+            let placedAll = false;
+            let placedRects = [];
+            let fontStep = 2;
+            let minFontLimit = 10;
+            let tryCount = 0;
+            while (!placedAll && minFont >= minFontLimit && tryCount < 10) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                // --- shape area ---
+                let shapeWidth, shapeHeight;
+                if (shape === 'circle') {
+                    const minDim = Math.min(canvas.width, canvas.height);
+                    shapeWidth = minDim;
+                    shapeHeight = minDim;
+                } else {
+                    shapeWidth = canvas.width;
+                    shapeHeight = canvas.height;
+                }
+                const maxFreq = Math.max(...availableWords.map(w => w.frequency));
+                const minFreq = Math.min(...availableWords.map(w => w.frequency));
+                placedRects = [];
+                let placedCount = 0;
+                availableWords.forEach((wordData, index) => {
+                    const frequency = wordData.frequency;
+                    let fontSize;
+                    if (maxFreq === minFreq) {
+                        fontSize = maxFont;
+                    } else {
+                        fontSize = Math.max(minFont, Math.min(maxFont, Math.round(minFont + (frequency - minFreq) / (maxFreq - minFreq) * (maxFont - minFont))));
+                    }
+                    ctx.font = `${fontSize}px "Space Grotesk"`;
+                    const textWidth = ctx.measureText(wordData.word).width;
+                    const textHeight = fontSize;
+                    // Color assignment by frequency and sentiment (brand palette)
+                    let color;
+                    if (sentiment === 'positive') {
+                        if (index === 0) {
+                            color = '#6DAE5B'; // Dusty Green
+                        } else {
+                            const altColors = [
+                                '#121212', // Onyx
+                                '#282828', // Thunder
+                                '#393C2C', // Dune
+                                '#BABE7C', // Lichen
+                                '#A7CE9D', // Green Spring Rain
+                                '#C5DFBD'  // Sea Mist
+                            ];
+                            color = altColors[(index - 1) % altColors.length];
+                        }
+                    } else if (sentiment === 'negative') {
+                        if (index === 0) {
+                            color = '#E7CB38'; // Wattle
+                        } else {
+                            const altColors = [
+                                '#121212', // Onyx
+                                '#282828', // Thunder
+                                '#393C2C', // Dune
+                                '#ECD560', // Arylide Yellow
+                                '#F1E088', // Wild Rice
+                                '#F5EAAF'  // Pale Leaf
+                            ];
+                            color = altColors[(index - 1) % altColors.length];
+                        }
+                    } else {
+                        // Neutral: top word is Ashen Twilight, rest cycle through gray palette
+                        if (index === 0) {
+                            color = '#7E8BA0'; // Ashen Twilight
+                        } else {
+                            const altColors = [
+                                '#121212', // Onyx
+                                '#282828', // Thunder
+                                '#393C2C', // Dune
+                                '#98A4B3', // Soft Smoke
+                                '#B2BBC5', // Silver Fog
+                                '#C8D1D9'  // Cloud Veil
+                            ];
+                            color = altColors[(index - 1) % altColors.length];
+                        }
+                    }
+                    // For the smallest 5 words, use no margin for bounding box
+                    let margin = (index >= availableWords.length - 5) ? 0 : 1;
+                    let placed = false;
+                    let angle = 0;
+                    let radius = 0;
+                    let attempts = 0;
+                    while (!placed && attempts < 2000) {
+                        let x, y;
+                        if (shape === 'oval') {
+                            x = canvas.width / 2 + Math.cos(angle) * radius * (shapeWidth / shapeHeight) - textWidth / 2;
+                            y = canvas.height / 2 + Math.sin(angle) * radius + textHeight / 2;
+                        } else {
+                            x = canvas.width / 2 + Math.cos(angle) * radius - textWidth / 2;
+                            y = canvas.height / 2 + Math.sin(angle) * radius + textHeight / 2;
+                        }
+                        const distanceFromCenter = Math.sqrt(
+                            Math.pow((x + textWidth/2 - canvas.width/2) / (shapeWidth/2), 2) + 
+                            Math.pow((y - textHeight/2 - canvas.height/2) / (shapeHeight/2), 2)
+                        );
+                        if (x >= 0 && x + textWidth <= canvas.width && 
+                            y - textHeight >= 0 && y <= canvas.height &&
+                            distanceFromCenter <= 1) {
+                            const rect = { x: x - margin, y: y - textHeight - margin, width: textWidth + 2*margin, height: textHeight + 2*margin };
+                            const collision = placedRects.some(placed => 
+                                rect.x < placed.x + placed.width &&
+                                rect.x + rect.width > placed.x &&
+                                rect.y < placed.y + placed.height &&
+                                rect.y + rect.height > placed.y
+                            );
+                            if (!collision) {
+                                ctx.fillStyle = color;
+                                ctx.fillText(wordData.word, x, y);
+                                placedRects.push(rect);
+                                placed = true;
+                                placedCount++;
+                            }
+                        }
+                        angle += 0.15;
+                        radius += 0.15;
+                        attempts++;
+                    }
+                    if (!placed) {
+                        for (let i = 0; i < 400; i++) {
+                            let x, y;
+                            if (shape === 'oval') {
+                                const randAngle = Math.random() * 2 * Math.PI;
+                                const randRadius = Math.random() * Math.min(shapeWidth/2, shapeHeight/2);
+                                x = canvas.width / 2 + Math.cos(randAngle) * randRadius * (shapeWidth / shapeHeight) - textWidth / 2;
+                                y = canvas.height / 2 + Math.sin(randAngle) * randRadius + textHeight / 2;
+                            } else {
+                                const randAngle = Math.random() * 2 * Math.PI;
+                                const randRadius = Math.random() * (shapeWidth/2);
+                                x = canvas.width / 2 + Math.cos(randAngle) * randRadius - textWidth / 2;
+                                y = canvas.height / 2 + Math.sin(randAngle) * randRadius + textHeight / 2;
+                            }
+                            if (x >= 0 && x + textWidth <= canvas.width && 
+                                y - textHeight >= 0 && y <= canvas.height) {
+                                const rect = { x: x - margin, y: y - textHeight - margin, width: textWidth + 2*margin, height: textHeight + 2*margin };
+                                const collision = placedRects.some(placed => 
+                                    rect.x < placed.x + placed.width &&
+                                    rect.x + rect.width > placed.x &&
+                                    rect.y < placed.y + placed.height &&
+                                    rect.y + rect.height > placed.y
+                                );
+                                if (!collision) {
+                                    ctx.fillStyle = color;
+                                    ctx.fillText(wordData.word, x, y);
+                                    placedRects.push(rect);
+                                    placed = true;
+                                    placedCount++;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                });
+                placedAll = (placedCount === availableWords.length);
+                if (!placedAll) {
+                    maxFont = Math.max(minFont + fontStep, Math.floor(maxFont * 0.92));
+                    minFont = Math.max(minFontLimit, Math.floor(minFont * 0.92));
+                }
+                tryCount++;
+            }
+        }
+
+        function showWordList() {
+            const wordListSection = document.getElementById('wordListSection');
+            const wordTags = document.getElementById('wordTags');
+            
+            wordListSection.classList.remove('hidden');
+            wordTags.innerHTML = '';
+            
+            wordFrequencies.forEach(wordData => {
+                const tag = document.createElement('div');
+                tag.className = `word-tag ${removedWords.has(wordData.word) ? 'removed' : ''}`;
+                tag.onclick = () => toggleWord(wordData.word);
+                
+                tag.innerHTML = `
+                    <span>${wordData.word}</span>
+                    <span class="word-frequency">${wordData.frequency}</span>
+                `;
+                
+                wordTags.appendChild(tag);
+            });
+        }
+
+        function downloadPNG() {
+            // Render the word cloud directly onto a high-res canvas for export
+            const exportWidth = 1920;
+            const exportHeight = 1080;
+            const downloadCanvas = document.createElement('canvas');
+            downloadCanvas.width = exportWidth;
+            downloadCanvas.height = exportHeight;
+            renderWordCloud(downloadCanvas, wordFrequencies, removedWords, currentSentiment, currentShape);
+            const link = document.createElement('a');
+            const now = new Date();
+            const timestamp = now.toISOString().split('T')[0];
+            link.download = `makersights-wordcloud-${timestamp}.png`;
+            link.href = downloadCanvas.toDataURL();
+            link.click();
+            showMessage('Word cloud downloaded successfully!', 'success');
+        }
+
+        function toggleWord(word) {
+            if (removedWords.has(word)) {
+                removedWords.delete(word);
+            } else {
+                removedWords.add(word);
+            }
+            
+            renderWordCloud();
+            showWordList();
+        }
+
+        function showControls() {
+            document.getElementById('cloudContainerSection').classList.remove('hidden');
+        }
+
+        function setLoadingState(loading) {
+            const button = document.querySelector('.generate-button');
+            const buttonText = button.querySelector('.button-text');
+            const loadingIcon = button.querySelector('.loading');
+            
+            if (loading) {
+                button.disabled = true;
+                buttonText.textContent = 'GENERATING...';
+                loadingIcon.classList.remove('hidden');
+            } else {
+                button.disabled = false;
+                buttonText.textContent = 'GENERATE WORD CLOUD';
+                loadingIcon.classList.add('hidden');
+            }
+        }
+
+        function showMessage(message, type) {
+            const messageArea = document.getElementById('messageArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+            messageDiv.textContent = message;
+            
+            messageArea.innerHTML = '';
+            messageArea.appendChild(messageDiv);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.remove();
+                }
+            }, 5000);
+        }
+
+        // 1. Responsive canvas setup and resize debounce
+        function resizeCanvas() {
+            const container = document.querySelector('.cloud-container');
+            const canvas = document.getElementById('wordCloudCanvas');
+            if (container && canvas) {
+                // Set canvas size to container size or fallback to window size
+                const width = Math.max(container.offsetWidth, 600);
+                const height = Math.max(container.offsetHeight, 400);
+                canvas.width = width;
+                canvas.height = height;
+                if (wordFrequencies.length > 0) {
+                    renderWordCloud();
+                }
+            }
+        }
+        let resizeTimeout;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(resizeCanvas, 200);
+        });
+        document.addEventListener('DOMContentLoaded', resizeCanvas);
+    </script>
+</body>
+</html>
