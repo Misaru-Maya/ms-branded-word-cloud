@@ -623,7 +623,7 @@
                     </div>
 
                     <button class="generate-button" onclick="generateWordCloud()">
-                        <span class="button-text">GENERATE WORD CLOUD</span>
+                        <span class="button-text">🪄GENERATE WORD CLOUD</span>
                         <span class="loading hidden"></span>
                     </button>
                 </div>
@@ -631,7 +631,7 @@
             <div class="cloud-container hidden" id="cloudContainerSection">
                 <div class="controls" id="controlsSection">
                     <button class="download-button-large" onclick="downloadPNG()" id="downloadBtn">
-                        DOWNLOAD PNG
+                        ✨DOWNLOAD
                     </button>
                 </div>
 
@@ -644,14 +644,14 @@
             <div class="right-panel">
                 <div class="word-list hidden" id="wordListSection">
                     <h3 style="margin-bottom: 0.5rem;">Words in Cloud</h3>
-                    <div style="font-size: 1rem; color: #7E8BA0; margin-bottom: 1rem;">(💡click to remove/restore!)</div>
+                    <div style="font-size: 1rem; color: #7E8BA0; margin-bottom: 1rem;">(click to remove/restore!)</div>
                     <div class="word-tags" id="wordTags"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="footer-credit">Built by Misaki, powered by ChatGPT, Claude, and Cursor🪄</div>
+    <div class="footer-credit">Built by Misaki, powered by ChatGPT, Claude, and Cursor🔥</div>
 
     <script>
         // Global variables
@@ -828,7 +828,7 @@
             document.querySelector('.text-input').value = demoData;
             // Switch to text tab
             document.querySelector('[data-tab="text"]').click();
-            showMessage('Demo data loaded! Click "Generate Word Cloud" to see it in action.', 'success');
+            showMessage('Demo data loaded! Click "🪄Generate Word Cloud" to see it in action.', 'success');
         }
 
         function generateWordCloud() {
@@ -966,6 +966,7 @@
             let fontStep = 2;
             let minFontLimit = 10;
             let tryCount = 0;
+            const padding = 8; // Padding to keep words inside the canvas
             while (!placedAll && minFont >= minFontLimit && tryCount < 10) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#FFFFFF';
@@ -1060,8 +1061,11 @@
                             Math.pow((x + textWidth/2 - canvas.width/2) / (shapeWidth/2), 2) + 
                             Math.pow((y - textHeight/2 - canvas.height/2) / (shapeHeight/2), 2)
                         );
-                        if (x >= 0 && x + textWidth <= canvas.width && 
-                            y - textHeight >= 0 && y <= canvas.height &&
+                        if (
+                            x >= padding &&
+                            x + textWidth <= canvas.width - padding &&
+                            y - textHeight >= padding &&
+                            y <= canvas.height - padding &&
                             distanceFromCenter <= 1) {
                             const rect = { x: x - margin, y: y - textHeight - margin, width: textWidth + 2*margin, height: textHeight + 2*margin };
                             const collision = placedRects.some(placed => 
@@ -1096,8 +1100,11 @@
                                 x = canvas.width / 2 + Math.cos(randAngle) * randRadius - textWidth / 2;
                                 y = canvas.height / 2 + Math.sin(randAngle) * randRadius + textHeight / 2;
                             }
-                            if (x >= 0 && x + textWidth <= canvas.width && 
-                                y - textHeight >= 0 && y <= canvas.height) {
+                            if (
+                                x >= padding &&
+                                x + textWidth <= canvas.width - padding &&
+                                y - textHeight >= padding &&
+                                y <= canvas.height - padding) {
                                 const rect = { x: x - margin, y: y - textHeight - margin, width: textWidth + 2*margin, height: textHeight + 2*margin };
                                 const collision = placedRects.some(placed => 
                                     rect.x < placed.x + placed.width &&
@@ -1148,18 +1155,13 @@
         }
 
         function downloadPNG() {
-            // Render the word cloud directly onto a high-res canvas for export
-            const exportWidth = 1920;
-            const exportHeight = 1080;
-            const downloadCanvas = document.createElement('canvas');
-            downloadCanvas.width = exportWidth;
-            downloadCanvas.height = exportHeight;
-            renderWordCloud(downloadCanvas, wordFrequencies, removedWords, currentSentiment, currentShape);
+            // Download the currently visible word cloud canvas as PNG
+            const canvas = document.getElementById('wordCloudCanvas');
             const link = document.createElement('a');
             const now = new Date();
             const timestamp = now.toISOString().split('T')[0];
             link.download = `makersights-wordcloud-${timestamp}.png`;
-            link.href = downloadCanvas.toDataURL();
+            link.href = canvas.toDataURL();
             link.click();
             showMessage('Word cloud downloaded successfully!', 'success');
         }
@@ -1190,7 +1192,7 @@
                 loadingIcon.classList.remove('hidden');
             } else {
                 button.disabled = false;
-                buttonText.textContent = 'GENERATE WORD CLOUD';
+                buttonText.textContent = '🪄GENERATE WORD CLOUD';
                 loadingIcon.classList.add('hidden');
             }
         }
