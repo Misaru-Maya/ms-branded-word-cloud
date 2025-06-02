@@ -6,6 +6,7 @@
     <title>MakerSights Word Cloud Generator</title>
     <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://unpkg.com/compromise@13.11.3/builds/compromise.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -257,12 +258,21 @@
             position: absolute;
             top: 1.5rem;
             right: 1.5rem;
-            gap: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.75rem;
             margin-bottom: 0;
             background: none;
             box-shadow: none;
             padding: 0;
             z-index: 2;
+            width:180px;
+        }
+
+        .controls > button {
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .download-button-large {
@@ -279,6 +289,7 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-left: auto;
+            width: 100%;
         }
 
         .download-button-large:hover:not(:disabled) {
@@ -553,6 +564,11 @@
             z-index: 1000;
             pointer-events: none;
         }
+
+        #resetLayoutBtn:focus, #resetLayoutBtn:active {
+            outline: 2.5px solid #6DAE5B !important;
+            box-shadow: 0 0 0 2px #E2EFDE;
+        }
     </style>
 </head>
 <body>
@@ -660,6 +676,10 @@
         let csvData = null;
         let currentSentiment = 'positive';
         let currentShape = 'circle';
+        let wordColors = {};
+        let wordFontSizes = {};
+        let lastColorSentiment = null;
+        let lastColorWords = [];
         
         // Color palettes based on MakerSights design guidelines
         const colorPalettes = {
@@ -904,14 +924,31 @@
                 .replace(/[^\p{L}\p{N}\s-]/gu, ' ')  // Remove punctuation except hyphens, keep Unicode letters/numbers
                 .replace(/\s+/g, ' ')
                 .trim();
-            // Split into words
-            const words = cleanText.split(' ').filter(word => 
+
+            // Use compromise to analyze the text
+            const nlpFn = window.nlp || (typeof nlp !== 'undefined' ? nlp : null);
+            if (!nlpFn) {
+                throw new Error('Compromise NLP library is not loaded.');
+            }
+            const doc = nlpFn(cleanText);
+            // Get adjectives and nouns (always as arrays)
+            const adjectives = doc.adjectives().terms().out('array');
+            const nouns = doc.nouns().terms().out('array');
+            // Only normalize nouns to singular
+            const normalizedNouns = nouns.map(normalizeToSingular);
+            // Combine and filter words
+            const words = [...adjectives, ...normalizedNouns].filter(word => 
                 word.length > 2 && 
                 !stopWords.has(word) &&
                 !/^\d+$/.test(word) &&
                 word !== 'not' &&
                 word !== 'specified'
             );
+            // Debug: log extracted words
+            console.log('Extracted adjectives:', adjectives);
+            console.log('Extracted nouns:', nouns);
+            console.log('Normalized nouns:', normalizedNouns);
+            console.log('Final words:', words);
             // Also filter out the phrase "not specified" if it appears as separate words
             const filteredWords = [];
             for (let i = 0; i < words.length; i++) {
@@ -921,11 +958,9 @@
                 }
                 filteredWords.push(words[i]);
             }
-            // Normalize to singular
-            const normalizedWords = filteredWords.map(normalizeToSingular);
             // Count frequencies
             const frequency = {};
-            normalizedWords.forEach(word => {
+            filteredWords.forEach(word => {
                 frequency[word] = (frequency[word] || 0) + 1;
             });
             // Convert to array and sort by frequency
@@ -934,6 +969,45 @@
                 .sort((a, b) => b.frequency - a.frequency)
                 .slice(0, 30);  // Top 30 words
             return sortedWords;
+        }
+
+        // Helper to shuffle array
+        function shuffleArray(array) {
+            let arr = array.slice();
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+        // Helper to assign colors with no more than 2 consecutive
+        function assignColorsNoCluster(baseColors, count) {
+            let result = [];
+            let colorPool = shuffleArray(baseColors);
+            let lastColor = null, streak = 0, colorIdx = 0;
+            for (let i = 0; i < count; i++) {
+                if (colorIdx >= colorPool.length) {
+                    colorPool = shuffleArray(baseColors);
+                    colorIdx = 0;
+                }
+                let color = colorPool[colorIdx];
+                // Prevent more than 2 consecutive
+                if (color === lastColor && streak >= 1) {
+                    // Find a different color
+                    let altIdx = colorPool.findIndex(c => c !== lastColor);
+                    if (altIdx !== -1) {
+                        color = colorPool[altIdx];
+                        colorIdx = altIdx;
+                    }
+                    streak = 0;
+                }
+                result.push(color);
+                if (color === lastColor) streak++;
+                else streak = 0;
+                lastColor = color;
+                colorIdx++;
+            }
+            return result;
         }
 
         function renderWordCloud(targetCanvas, customWordFrequencies, customRemovedWords, customSentiment, customShape) {
@@ -961,9 +1035,65 @@
                 }
                 return;
             }
+            // --- STRICT COLOR LOGIC WITH STABLE COLORS ---
+            // Only assign colors if sentiment or word list changes
+            let currentWords = availableWords.map(w => w.word).join(',');
+            let lastWords = lastColorWords.join(',');
+            if (sentiment !== lastColorSentiment || currentWords !== lastWords) {
+                wordColors = {};
+                let colorList = [];
+                if (sentiment === 'positive') {
+                    const first = '#6DAE5B'; // Dusty Green
+                    const second = '#B2BBC5'; // Silver Fog
+                    const third = '#A7CE9D'; // Green Spring Rain
+                    const restPalette = ['#282828', '#A7CE9D', '#B2BBC5', '#6DAE5B'];
+                    colorList = [first, second, third];
+                    if (availableWords.length > 3) {
+                        const restColors = assignColorsNoCluster(restPalette, availableWords.length - 3);
+                        colorList = colorList.concat(restColors);
+                    }
+                    colorList = colorList.slice(0, availableWords.length);
+                } else if (sentiment === 'negative') {
+                    const first = '#E7CB38'; // Wattle
+                    const second = '#ECD560'; // Arylide Yellow
+                    const third = '#F1E088'; // Wild Rice
+                    const restPalette = ['#282828', '#393C2C', '#ECD560', '#F1E088', '#B2BBC5'];
+                    colorList = [first, second, third];
+                    if (availableWords.length > 3) {
+                        const restColors = assignColorsNoCluster(restPalette, availableWords.length - 3);
+                        colorList = colorList.concat(restColors);
+                    }
+                    colorList = colorList.slice(0, availableWords.length);
+                } else {
+                    const first = '#7E8BA0'; // Ashen Twilight
+                    const restPalette = ['#121212', '#282828', '#393C2C', '#98A4B3', '#B2BBC5', '#C8D1D9'];
+                    colorList = [first];
+                    if (availableWords.length > 1) {
+                        const restColors = assignColorsNoCluster(restPalette, availableWords.length - 1);
+                        colorList = colorList.concat(restColors);
+                    }
+                    colorList = colorList.slice(0, availableWords.length);
+                }
+                for (let i = 0; i < availableWords.length; i++) {
+                    wordColors[availableWords[i].word] = colorList[i];
+                }
+                lastColorSentiment = sentiment;
+                lastColorWords = availableWords.map(w => w.word);
+            }
             // --- DYNAMIC FONT SIZE LOOP ---
             let maxFont = Math.round(canvas.height / 4);
             let minFont = Math.round(canvas.height / 32);
+            let needToAssignFontSizes = false;
+            if (Object.keys(wordFontSizes).length !== availableWords.length) {
+                needToAssignFontSizes = true;
+            } else {
+                for (let i = 0; i < availableWords.length; i++) {
+                    if (!wordFontSizes[availableWords[i].word]) {
+                        needToAssignFontSizes = true;
+                        break;
+                    }
+                }
+            }
             let placedAll = false;
             let placedRects = [];
             let fontStep = 2;
@@ -991,141 +1121,86 @@
                 availableWords.forEach((wordData, index) => {
                     const frequency = wordData.frequency;
                     let fontSize;
-                    if (maxFreq === minFreq) {
-                        fontSize = maxFont;
+                    if (needToAssignFontSizes) {
+                        if (maxFreq === minFreq) {
+                            fontSize = maxFont;
+                        } else {
+                            fontSize = Math.max(minFont, Math.min(maxFont, Math.round(minFont + (frequency - minFreq) / (maxFreq - minFreq) * (maxFont - minFont))));
+                        }
+                        wordFontSizes[wordData.word] = fontSize;
                     } else {
-                        fontSize = Math.max(minFont, Math.min(maxFont, Math.round(minFont + (frequency - minFreq) / (maxFreq - minFreq) * (maxFont - minFont))));
+                        fontSize = wordFontSizes[wordData.word];
                     }
-                    ctx.font = `${fontSize}px "Space Grotesk"`;
-                    const textWidth = ctx.measureText(wordData.word).width;
-                    const textHeight = fontSize;
-                    // Color assignment by frequency and sentiment (brand palette)
-                    let color;
-                    if (sentiment === 'positive') {
-                        if (index === 0) {
-                            color = '#6DAE5B'; // Dusty Green
-                        } else {
-                            const altColors = [
-                                '#121212', // Onyx
-                                '#282828', // Thunder
-                                '#393C2C', // Dune
-                                '#BABE7C', // Lichen
-                                '#A7CE9D', // Green Spring Rain
-                                '#C5DFBD'  // Sea Mist
-                            ];
-                            color = altColors[(index - 1) % altColors.length];
-                        }
-                    } else if (sentiment === 'negative') {
-                        if (index === 0) {
-                            color = '#E7CB38'; // Wattle
-                        } else {
-                            const altColors = [
-                                '#121212', // Onyx
-                                '#282828', // Thunder
-                                '#393C2C', // Dune
-                                '#ECD560', // Arylide Yellow
-                                '#F1E088', // Wild Rice
-                                '#F5EAAF'  // Pale Leaf
-                            ];
-                            color = altColors[(index - 1) % altColors.length];
-                        }
-                    } else {
-                        // Neutral: top word is Ashen Twilight, rest cycle through gray palette
-                        if (index === 0) {
-                            color = '#7E8BA0'; // Ashen Twilight
-                        } else {
-                            const altColors = [
-                                '#121212', // Onyx
-                                '#282828', // Thunder
-                                '#393C2C', // Dune
-                                '#98A4B3', // Soft Smoke
-                                '#B2BBC5', // Silver Fog
-                                '#C8D1D9'  // Cloud Veil
-                            ];
-                            color = altColors[(index - 1) % altColors.length];
-                        }
-                    }
-                    // For the smallest 5 words, use no margin for bounding box
+                    let color = wordColors[wordData.word] || colorList[index];
                     let margin = (index >= availableWords.length - 5) ? 0 : 1;
                     let placed = false;
                     let angle = 0;
                     let radius = 0;
                     let attempts = 0;
-                    while (!placed && attempts < 2000) {
-                        let x, y;
-                        if (shape === 'oval') {
-                            x = canvas.width / 2 + Math.cos(angle) * radius * (shapeWidth / shapeHeight) - textWidth / 2;
-                            y = canvas.height / 2 + Math.sin(angle) * radius + textHeight / 2;
-                        } else {
-                            x = canvas.width / 2 + Math.cos(angle) * radius - textWidth / 2;
-                            y = canvas.height / 2 + Math.sin(angle) * radius + textHeight / 2;
-                        }
-                        const distanceFromCenter = Math.sqrt(
-                            Math.pow((x + textWidth/2 - canvas.width/2) / (shapeWidth/2), 2) + 
-                            Math.pow((y - textHeight/2 - canvas.height/2) / (shapeHeight/2), 2)
-                        );
-                        if (
-                            x >= padding &&
-                            x + textWidth <= canvas.width - padding &&
-                            y - textHeight >= padding &&
-                            y <= canvas.height - padding &&
-                            distanceFromCenter <= 1) {
-                            const rect = { x: x - margin, y: y - textHeight - margin, width: textWidth + 2*margin, height: textHeight + 2*margin };
-                            const collision = placedRects.some(placed => 
-                                rect.x < placed.x + placed.width &&
-                                rect.x + rect.width > placed.x &&
-                                rect.y < placed.y + placed.height &&
-                                rect.y + rect.height > placed.y
-                            );
-                            if (!collision) {
-                                ctx.fillStyle = color;
-                                ctx.fillText(wordData.word, x, y);
-                                placedRects.push(rect);
-                                placed = true;
-                                placedCount++;
-                            }
-                        }
-                        angle += 0.15;
-                        radius += 0.15;
-                        attempts++;
-                    }
-                    if (!placed) {
-                        for (let i = 0; i < 400; i++) {
+                    let minFontLimit = 10;
+                    let fontSizeStep = Math.max(2, Math.floor(fontSize * 0.05));
+                    let originalFontSize = fontSize;
+                    let triedFontSizes = new Set();
+                    // Try to place the word, reducing font size if needed
+                    while (!placed && fontSize >= minFontLimit) {
+                        ctx.font = `${fontSize}px "Space Grotesk"`;
+                        const textWidth = ctx.measureText(wordData.word).width;
+                        const textHeight = fontSize;
+                        // Try spiral/random placement up to 3000 attempts per font size
+                        let localAttempts = 0;
+                        while (!placed && localAttempts < 3000) {
                             let x, y;
-                            if (shape === 'oval') {
-                                const randAngle = Math.random() * 2 * Math.PI;
-                                const randRadius = Math.random() * Math.min(shapeWidth/2, shapeHeight/2);
-                                x = canvas.width / 2 + Math.cos(randAngle) * randRadius * (shapeWidth / shapeHeight) - textWidth / 2;
-                                y = canvas.height / 2 + Math.sin(randAngle) * randRadius + textHeight / 2;
+                            if (index === 0) {
+                                x = canvas.width / 2 - textWidth / 2;
+                                y = canvas.height / 2 + textHeight / 2;
                             } else {
-                                const randAngle = Math.random() * 2 * Math.PI;
-                                const randRadius = Math.random() * (shapeWidth/2);
-                                x = canvas.width / 2 + Math.cos(randAngle) * randRadius - textWidth / 2;
-                                y = canvas.height / 2 + Math.sin(randAngle) * randRadius + textHeight / 2;
+                                let spiralDir = (index % 2 === 0) ? 1 : -1;
+                                let spiralAngle = angle * spiralDir;
+                                if (shape === 'oval') {
+                                    x = canvas.width / 2 + Math.cos(spiralAngle) * radius * (shapeWidth / shapeHeight) - textWidth / 2;
+                                    y = canvas.height / 2 + Math.sin(spiralAngle) * radius + textHeight / 2;
+                                } else {
+                                    x = canvas.width / 2 + Math.cos(spiralAngle) * radius - textWidth / 2;
+                                    y = canvas.height / 2 + Math.sin(spiralAngle) * radius + textHeight / 2;
+                                }
                             }
-                            if (
+                            // Use the same bounding box logic as for highlight
+                            let rectX = x, rectY = y - textHeight, rectW = textWidth, rectH = textHeight;
+                            const collision = placedRects.some(placed =>
+                                rectX < placed.x + placed.width &&
+                                rectX + rectW > placed.x &&
+                                rectY < placed.y + placed.height &&
+                                rectY + rectH > placed.y
+                            );
+                            if (!collision &&
                                 x >= padding &&
                                 x + textWidth <= canvas.width - padding &&
                                 y - textHeight >= padding &&
                                 y <= canvas.height - padding) {
-                                const rect = { x: x - margin, y: y - textHeight - margin, width: textWidth + 2*margin, height: textHeight + 2*margin };
-                                const collision = placedRects.some(placed => 
-                                    rect.x < placed.x + placed.width &&
-                                    rect.x + rect.width > placed.x &&
-                                    rect.y < placed.y + placed.height &&
-                                    rect.y + rect.height > placed.y
-                                );
-                                if (!collision) {
-                                    ctx.fillStyle = color;
-                                    ctx.fillText(wordData.word, x, y);
-                                    placedRects.push(rect);
-                                    placed = true;
-                                    placedCount++;
-                                    break;
-                                }
+                                ctx.fillStyle = color;
+                                ctx.font = `${fontSize}px "Space Grotesk"`;
+                                ctx.fillText(wordData.word, x, y);
+                                placedRects.push({x: x, y: y - textHeight, width: textWidth, height: textHeight});
+                                placed = true;
+                                placedCount++;
+                                break;
                             }
+                            angle += 0.15;
+                            radius += 0.15;
+                            localAttempts++;
+                        }
+                        if (!placed) {
+                            // Reduce font size and try again
+                            triedFontSizes.add(fontSize);
+                            let nextFont = fontSize - fontSizeStep;
+                            // Find next unused font size
+                            while (triedFontSizes.has(nextFont) && nextFont >= minFontLimit) {
+                                nextFont -= fontSizeStep;
+                            }
+                            fontSize = nextFont;
                         }
                     }
+                    // If still not placed, skip this word
                 });
                 placedAll = (placedCount === availableWords.length);
                 if (!placedAll) {
