@@ -595,10 +595,9 @@
                     <div class="input-area" id="csv-tab">
                         <div class="file-upload" onclick="document.getElementById('csvFile').click()" style="width: 100%;">
                             <input type="file" id="csvFile" class="file-input" accept=".csv" />
-                            <p>📄 Click to upload CSV file or drag and drop</p>
+                            <p>📄 Click here or drag and drop</p>
                         </div>
                         <div id="columnSelector" class="hidden" style="margin-top: 1rem;">
-                            <label for="columnSelect" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Select the column containing text data:</label>
                             <select id="columnSelect" style="padding: 0.5rem; border: 2px solid #E3E2DF; border-radius: 4px; font-family: 'Space Grotesk', sans-serif;"></select>
                         </div>
                     </div>
@@ -875,30 +874,31 @@
                 return;
             }
             // 2. Large input size limit
-            const maxInputLength = 100000; // 100k chars
+            const maxInputLength = 1000000; // 1 million chars for large CSVs
             if (inputText.length > maxInputLength) {
-                showMessage('Input is too large. Please provide less than 100,000 characters.', 'error');
+                showMessage('Input is too large. Please provide less than 1,000,000 characters.', 'error');
                 return;
             }
             setLoadingState(true);
             setTimeout(() => {
-                try {
-                    const processedWords = processText(inputText);
-                    if (processedWords.length < 5) {
-                        showMessage('Not enough valid words found. Please provide more text or try different content.', 'error');
+                processTextInBatches(inputText)
+                    .then(processedWords => {
+                        if (processedWords.length < 5) {
+                            showMessage('Not enough valid words found. Please provide more text or try different content.', 'error');
+                            setLoadingState(false);
+                            return;
+                        }
+                        wordFrequencies = processedWords;
+                        removedWords.clear();
+                        renderWordCloud();
+                        showWordList();
+                        showControls();
                         setLoadingState(false);
-                        return;
-                    }
-                    wordFrequencies = processedWords;
-                    removedWords.clear();
-                    renderWordCloud();
-                    showWordList();
-                    showControls();
-                    setLoadingState(false);
-                } catch (error) {
-                    showMessage('Error generating word cloud: ' + error.message, 'error');
-                    setLoadingState(false);
-                }
+                    })
+                    .catch(error => {
+                        showMessage('Error generating word cloud: ' + error.message, 'error');
+                        setLoadingState(false);
+                    });
             }, 500);
         }
 
@@ -918,57 +918,58 @@
             return word;
         }
 
-        function processText(text) {
-            // 3. Unicode-aware cleaning
-            let cleanText = text.toLowerCase()
-                .replace(/[^\p{L}\p{N}\s-]/gu, ' ')  // Remove punctuation except hyphens, keep Unicode letters/numbers
-                .replace(/\s+/g, ' ')
-                .trim();
+        // Batched text processing for large input
+        function processTextInBatches(text, batchSize = 10000) {
+            // Split text into batches
+            let batches = [];
+            for (let i = 0; i < text.length; i += batchSize) {
+                batches.push(text.slice(i, i + batchSize));
+            }
+            let allWords = [];
+            let batchIndex = 0;
 
-            // Use compromise to analyze the text
-            const nlpFn = window.nlp || (typeof nlp !== 'undefined' ? nlp : null);
-            if (!nlpFn) {
-                throw new Error('Compromise NLP library is not loaded.');
-            }
-            const doc = nlpFn(cleanText);
-            // Get adjectives and nouns (always as arrays)
-            const adjectives = doc.adjectives().terms().out('array');
-            const nouns = doc.nouns().terms().out('array');
-            // Only normalize nouns to singular
-            const normalizedNouns = nouns.map(normalizeToSingular);
-            // Combine and filter words
-            const words = [...adjectives, ...normalizedNouns].filter(word => 
-                word.length > 2 && 
-                !stopWords.has(word) &&
-                !/^\d+$/.test(word) &&
-                word !== 'not' &&
-                word !== 'specified'
-            );
-            // Debug: log extracted words
-            console.log('Extracted adjectives:', adjectives);
-            console.log('Extracted nouns:', nouns);
-            console.log('Normalized nouns:', normalizedNouns);
-            console.log('Final words:', words);
-            // Also filter out the phrase "not specified" if it appears as separate words
-            const filteredWords = [];
-            for (let i = 0; i < words.length; i++) {
-                if (words[i] === 'not' && words[i + 1] === 'specified') {
-                    i++;
-                    continue;
+            return new Promise((resolve, reject) => {
+                function processNextBatch() {
+                    if (batchIndex >= batches.length) {
+                        // All batches processed, now count frequencies
+                        const frequency = {};
+                        allWords.forEach(word => {
+                            frequency[word] = (frequency[word] || 0) + 1;
+                        });
+                        // Convert to array and sort by frequency
+                        const sortedWords = Object.entries(frequency)
+                            .map(([word, freq]) => ({ word, frequency: freq }))
+                            .sort((a, b) => b.frequency - a.frequency)
+                            .slice(0, 50);  // Top 50 words for performance
+                        resolve(sortedWords);
+                        return;
+                    }
+                    let cleanText = batches[batchIndex].toLowerCase()
+                        .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    const nlpFn = window.nlp || (typeof nlp !== 'undefined' ? nlp : null);
+                    if (!nlpFn) {
+                        reject(new Error('Compromise NLP library is not loaded.'));
+                        return;
+                    }
+                    const doc = nlpFn(cleanText);
+                    const adjectives = doc.adjectives().terms().out('array');
+                    const nouns = doc.nouns().terms().out('array');
+                    const normalizedNouns = nouns.map(normalizeToSingular);
+                    const words = [...adjectives, ...normalizedNouns].filter(word =>
+                        word.length > 2 &&
+                        !stopWords.has(word) &&
+                        !/^\d+$/.test(word) &&
+                        word !== 'not' &&
+                        word !== 'specified'
+                    );
+                    allWords = allWords.concat(words);
+                    batchIndex++;
+                    setTimeout(processNextBatch, 0); // Yield to browser
                 }
-                filteredWords.push(words[i]);
-            }
-            // Count frequencies
-            const frequency = {};
-            filteredWords.forEach(word => {
-                frequency[word] = (frequency[word] || 0) + 1;
+                processNextBatch();
             });
-            // Convert to array and sort by frequency
-            const sortedWords = Object.entries(frequency)
-                .map(([word, freq]) => ({ word, frequency: freq }))
-                .sort((a, b) => b.frequency - a.frequency)
-                .slice(0, 30);  // Top 30 words
-            return sortedWords;
         }
 
         // Helper to shuffle array
