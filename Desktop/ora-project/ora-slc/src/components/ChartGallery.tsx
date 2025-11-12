@@ -140,22 +140,33 @@ const ChartCard: React.FC<ChartCardProps> = ({
   const statSigMenuRef = useRef<HTMLDivElement | null>(null)
   const heatmapProductFilterRef = useRef<HTMLDivElement | null>(null)
   const heatmapAttributeFilterRef = useRef<HTMLDivElement | null>(null)
+  const previousQuestionIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    setCardSort(question.isLikert || isSentimentQuestion ? 'alphabetical' : 'default')
-    // Filter out excluded values from defaults
-    const allOptions = series.data.map(d => d.option).filter(option => {
-      const displayValue = series.data.find(d => d.option === option)?.optionDisplay || option
-      return !isExcludedValue(displayValue)
-    })
-    // If more than 10 options, keep only the top 10 by default
-    const selectedDefaults = allOptions.length > 10
-      ? allOptions.slice(0, 10)
-      : allOptions
-    setSelectedOptions(selectedDefaults)
-    // Reset custom order when question changes
-    setCustomOptionOrder([])
-  }, [series, question.isLikert, isSentimentQuestion])
+    // Only reset selections when the question itself changes, not when the data changes
+    const questionChanged = previousQuestionIdRef.current !== question.qid
+
+    if (questionChanged) {
+      previousQuestionIdRef.current = question.qid
+      setCardSort(question.isLikert || isSentimentQuestion ? 'alphabetical' : 'default')
+
+      // Filter out excluded values from defaults
+      const allOptions = series.data.map(d => d.option).filter(option => {
+        const displayValue = series.data.find(d => d.option === option)?.optionDisplay || option
+        return !isExcludedValue(displayValue)
+      })
+
+      // For ranking questions, show all options by default
+      // For other questions with more than 10 options, keep only the top 10 by default
+      const selectedDefaults = question.type === 'ranking'
+        ? allOptions
+        : (allOptions.length > 10 ? allOptions.slice(0, 10) : allOptions)
+      setSelectedOptions(selectedDefaults)
+
+      // Reset custom order when question changes
+      setCustomOptionOrder([])
+    }
+  }, [series, question.qid, question.isLikert, question.type, isSentimentQuestion])
 
   useEffect(() => {
     setChartOrientation(orientation)
@@ -947,7 +958,7 @@ const ChartCard: React.FC<ChartCardProps> = ({
             )}
           </div>
           )}
-          {(canUsePie || canUseStacked || canUseHeatmap) && (
+          {(canUsePie || canUseStacked || canUseHeatmap) && question.type !== 'ranking' && (
             <>
               <div className="flex items-center gap-0.5" style={{ backgroundColor: '#EEF2F6', border: '1px solid #EEF2F6', borderRadius: '3px' }}>
                 <button
@@ -1187,14 +1198,16 @@ const ChartCard: React.FC<ChartCardProps> = ({
           if (isSentimentQuestion) {
             console.log('📊 Rendering SentimentHeatmap for sentiment question')
             return (
-              <SentimentHeatmap
-                dataset={dataset}
-                productColumn={productColumn}
-                questionLabel={displayLabel}
-                questionId={question.qid}
-                hideAsterisks={hideAsterisks}
-                onSaveQuestionLabel={onSaveQuestionLabel}
-              />
+              <div style={{ marginBottom: '20px' }}>
+                <SentimentHeatmap
+                  dataset={dataset}
+                  productColumn={productColumn}
+                  questionLabel={displayLabel}
+                  questionId={question.qid}
+                  hideAsterisks={hideAsterisks}
+                  onSaveQuestionLabel={onSaveQuestionLabel}
+                />
+              </div>
             )
           }
 
